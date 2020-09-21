@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+
 	//"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -54,7 +56,9 @@ type CreateCertificate struct {
 
 func (ds *MQTTDatasource) handleCreateCertificate(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only post requests
-
+	var policyInput iot.CreatePolicyInput
+	var keysCertificateInput iot.CreateKeysAndCertificateInput
+	var attachPolicyInput iot.AttachPrincipalPolicyInput
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -71,10 +75,14 @@ func (ds *MQTTDatasource) handleCreateCertificate(resp http.ResponseWriter, req 
 	//	topic          string. optional. "*" if empty
 	//	client         string. optional. "*" if empty
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	out, err := svc.CreatePolicyWithContext(req.Context(), &policyInput)
+	if err != nil {
+		throw(resp, 500, "Error while creating policy!", err.Error())
+	}
 
 	// TODO: create following resources with following information
 	// AWS IoT Policy (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.CreatePolicyWithContext)
@@ -113,11 +121,19 @@ func (ds *MQTTDatasource) handleCreateCertificate(resp http.ResponseWriter, req 
 	// Attach the created policy to certificate (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.AttachPrincipalPolicyWithContext)
 
 	// TODO: enable transaction lock. Say if certificate creation fails, corresponding policy must be deleted
+	outKeysCertificates, err := svc.CreateKeysAndCertificateWithContext(req.Context(), &keysCertificateInput)
+	if err != nil {
+		throw(resp, 500, "Could not create keys and certificates!", err.Error())
+	}
+	principalPolicyOutput, err := svc.AttachPrincipalPolicyWithContext(req.Context(), &attachPolicyInput)
+	if err != nil {
+		throw(resp, 500, "Could not attach principal policy!", err.Error())
+	}
 
 	certificate := CreateCertificate{
-		Id: "72dd3f3e77",
+		Id:     "72dd3f3e77",
 		Status: "ACTIVE",
-		Topic: "/1/2/*",
+		Topic:  "/1/2/*",
 		Client: "/1/2/*",
 		PublicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApsssipafEUmLQZUtDtYd
@@ -214,6 +230,8 @@ type Certificate struct {
 
 func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only get requests
+	var listPolicyInput iot.ListPoliciesInput
+	var listPolicyPrincipalInput iot.ListPolicyPrincipalsInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -227,10 +245,19 @@ func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *h
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	policyOutput, err := svc.ListPoliciesWithContext(req.Context(), &listPolicyInput)
+	if err != nil {
+		throw(resp, 500, "Could not list policies!", err.Error())
+	}
+
+	principalPolicyOutput, err := svc.ListPolicyPrincipalsWithContext(req.Context(), &listPolicyPrincipalInput)
+	if err != nil {
+		throw(resp, 500, "Could not list principal policy!", err.Error())
+	}
 
 	// TODO: list certificates which have policies for current orgId and dsId
 	// Steps:
@@ -255,7 +282,7 @@ func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *h
 		Certificate{Id: "91c2e97079d5c4688af516a58f7e4de03a9da40b5cdfefe8232473b0c5dcf1b0", Status: "INACTIVE", Topic: "/1/2/*", Client: "/1/2/*"},
 		Certificate{Id: "0041fd2d647fb6835ea3ab6a0d13fd3c6c0aa7beb9bcb0191068cf081c3127b9", Status: "INACTIVE", Topic: "/1/2/*", Client: "/1/2/*"},
 		Certificate{Id: "b5fcad63461f690c724bb76c506eefac06735275cac5bb7727195746d1b844e9", Status: "REVOKED", Topic: "/1/2/*", Client: "/1/2/*"},
-        }
+	}
 
 	responseBytes, err := json.Marshal(certificates)
 	if err != nil {
@@ -267,6 +294,7 @@ func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *h
 
 func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
+	var updateCertificateInput iot.UpdateCertificateInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -286,10 +314,14 @@ func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, r
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	updateOutput, err := svc.UpdateCertificateWithContext(req.Context(), &updateCertificateInput)
+	if err != nil {
+		throw(resp, 500, "Could not update certificate!", err.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to ACTIVE (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
@@ -298,7 +330,7 @@ func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, r
 
 func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
-
+	var updateCertificateInput iot.UpdateCertificateInput
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -317,10 +349,14 @@ func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter,
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	updateOutput, err := svc.UpdateCertificateWithContext(req.Context(), &updateCertificateInput)
+	if err != nil {
+		throw(resp, 500, "Could not update certificate!", err.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to INACTIVE (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
@@ -330,6 +366,8 @@ func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter,
 func (ds *MQTTDatasource) handleRevokeCertificate(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
 
+	var updateCertificateInput iot.UpdateCertificateInput
+
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -348,10 +386,14 @@ func (ds *MQTTDatasource) handleRevokeCertificate(resp http.ResponseWriter, req 
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	updateOutput, err := svc.UpdateCertificateWithContext(req.Context(), &updateCertificateInput)
+	if err != nil {
+		throw(resp, 500, "Could not update certificate!", err.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to REVOKED (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
@@ -361,6 +403,10 @@ func (ds *MQTTDatasource) handleRevokeCertificate(resp http.ResponseWriter, req 
 func (ds *MQTTDatasource) handleDeleteCertificate(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only delete requests
 
+	var listPrincipalPoliciesInput iot.ListPrincipalPoliciesInput
+	var deletePolicyInput iot.DeletePolicyInput
+	var deleteCertificateInput iot.DeleteCertificateInput
+
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -379,11 +425,23 @@ func (ds *MQTTDatasource) handleDeleteCertificate(resp http.ResponseWriter, req 
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
 
+	principalPolicyOutput, err := svc.ListPrincipalPoliciesWithContext(req.Context(), &listPrincipalPoliciesInput)
+	if err != nil {
+		throw(resp, 500, "Could not list principal policies!", err.Error())
+	}
+	deletePolicyOutput, err != svc.DeletePolicyWithContext(req.Context(), &deletePolicyInput)
+	if err != nil{
+		throw(resp, 500, "Could not delete policy!", err.Error())
+	} 
+	deleteCertificateOutput, err := svc.DeleteCertificateWithContext(req.Context(), &deleteCertificateInput)
+	if err != nil{
+		throw(resp, 500, "Could delete policy with context!", err.Error())
+	} 
 	// TODO: delete the corresponding policy and certificate
 	// Steps:
 	//	1. List policy associated with the certificate (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.ListPrincipalPoliciesWithContext)
@@ -515,6 +573,8 @@ func (ds *MQTTDatasource) handleGetCA(resp http.ResponseWriter, req *http.Reques
 func (ds *MQTTDatasource) handleGetRegistrationCode(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only get requests
 
+	var regCodeInput iot.GetRegistrationCodeInput
+
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -527,10 +587,15 @@ func (ds *MQTTDatasource) handleGetRegistrationCode(resp http.ResponseWriter, re
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	regCodeOutput, err := svc.GetRegistrationCodeWithContext(req.Context(), &regCodeInput)
+	if err != nil {
+		throw(resp, 500, "Could not get registration code with context!", err.Error())
+	}
 
 	// TODO https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.GetRegistrationCodeWithContext
 
@@ -539,6 +604,8 @@ func (ds *MQTTDatasource) handleGetRegistrationCode(resp http.ResponseWriter, re
 
 func (ds *MQTTDatasource) handleRegisterCA(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only post requests
+	var policyInput iot.CreatePolicyInput
+	var certificateInput iot.RegisterCACertificateInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -558,10 +625,19 @@ func (ds *MQTTDatasource) handleRegisterCA(resp http.ResponseWriter, req *http.R
 	//	topic          string. optional. "*" if empty
 	//	client         string. optional. "*" if empty
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	policyOutput, err := svc.CreatePolicyWithContext(req.Context(), &policyInput)
+	if err != nil {
+		throw(resp, 500, "Could not create policy!", err.Error())
+	}
+	certificateOutput, err != svc.RegisterCACertificateWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		throw(resp, 500, "Could not register certificate!", err.Error())
+	}
 
 	// TODO: create following resources with following information
 	// AWS IoT Policy (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.CreatePolicyWithContext)
@@ -610,12 +686,12 @@ func (ds *MQTTDatasource) handleRegisterCA(resp http.ResponseWriter, req *http.R
 
 	// TODO: enable transaction lock. Say if certificate creation fails, corresponding policy must be deleted
 
-
 	fmt.Fprintf(resp, "Hello, %q from %q", req.URL.Path, region)
 }
 
 func (ds *MQTTDatasource) handleCASetInactive(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
+	var certificateInput iot.UpdateCACertificateInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -629,10 +705,15 @@ func (ds *MQTTDatasource) handleCASetInactive(resp http.ResponseWriter, req *htt
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	certificateOutput, err := svc.UpdateCACertificateWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		throw(resp, 500, "Error while updating certificate!", err.Error())
+	}
 
 	// TODO https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCACertificateWithContext
 
@@ -641,7 +722,7 @@ func (ds *MQTTDatasource) handleCASetInactive(resp http.ResponseWriter, req *htt
 
 func (ds *MQTTDatasource) handleCASetActive(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
-
+	var certificateInput iot.UpdateCACertificateInput
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -654,10 +735,14 @@ func (ds *MQTTDatasource) handleCASetActive(resp http.ResponseWriter, req *http.
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+	certificateOutput, err := svc.UpdateCACertificateWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		throw(resp, 500, "Error while updating certificate!", err.Error())
+	}
 
 	// TODO https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCACertificateWithContext
 
@@ -667,6 +752,7 @@ func (ds *MQTTDatasource) handleCASetActive(resp http.ResponseWriter, req *http.
 func (ds *MQTTDatasource) handleCAEnableAutoRegistration(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
 
+	var certificateInput iot.UpdateCACertificateInput
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -679,10 +765,15 @@ func (ds *MQTTDatasource) handleCAEnableAutoRegistration(resp http.ResponseWrite
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	certificateOutput, err := svc.UpdateCACertificateWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		throw(resp, 500, "Error while updating certificate!", err.Error())
+	}
 
 	// TODO https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCACertificateWithContext
 
@@ -691,6 +782,7 @@ func (ds *MQTTDatasource) handleCAEnableAutoRegistration(resp http.ResponseWrite
 
 func (ds *MQTTDatasource) handleCADisableAutoRegistration(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
+	var certificateInput iot.UpdateCACertificateInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -704,11 +796,15 @@ func (ds *MQTTDatasource) handleCADisableAutoRegistration(resp http.ResponseWrit
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
 
+	certificateOutput, err := svc.UpdateCACertificateWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		log.Fatal(err)
+	}
 	// TODO https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCACertificateWithContext
 
 	fmt.Fprintf(resp, "Hello, %q from %q", req.URL.Path, region)
@@ -716,6 +812,7 @@ func (ds *MQTTDatasource) handleCADisableAutoRegistration(resp http.ResponseWrit
 
 func (ds *MQTTDatasource) handleDeleteCA(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only delete requests
+	var certificateInput iot.ListCertificatesByCAInput
 
 	region := req.URL.Query().Get("region")
 	if region == "" {
@@ -729,10 +826,15 @@ func (ds *MQTTDatasource) handleDeleteCA(resp http.ResponseWriter, req *http.Req
 		return
 	}
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	certificateOutput, err := svc.ListCertificatesByCAWithContext(req.Context(), &certificateInput)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// TODO:
 	// 1. List certificates associated (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.ListCertificatesByCAWithContext)
