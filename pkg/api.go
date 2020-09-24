@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	//"strconv"
@@ -81,10 +82,12 @@ func (ds *MQTTDatasource) handleCreateCertificate(resp http.ResponseWriter, req 
 	}
 
 	policyOut, err := svc.CreatePolicyWithContext(req.Context(), &createPolicyInput)
+	log.Println(policyOut)
 	if err != nil {
 		throw(resp, 500, "Could not create policy!", err.Error())
 	}
 	keysCertificatesOut, err := svc.CreateKeysAndCertificateWithContext(req.Context(), &keysCertificateInput)
+	log.Println(keysCertificatesOut)
 	if err != nil {
 		throw(resp, 500, "Could not create keys and certificate!", err.Error())
 	}
@@ -244,6 +247,7 @@ func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *h
 		throw(resp, 500, "Could not provision storage!", err.Error())
 		return
 	}
+	log.Print(req.Context())
 
 	//svc, err := ds.authenticate(req.Context(), region)
 	//if err != nil {
@@ -430,10 +434,12 @@ func (ds *MQTTDatasource) handleDeleteCertificate(resp http.ResponseWriter, req 
 		throw(resp, 500, "Could not create session!", err.Error())
 	}
 	policiesOut, err := svc.ListPrincipalPoliciesWithContext(req.Context(), &policiesInput)
+	log.Println(policiesOut)
 	if err != nil {
 		throw(resp, 500, "Could not list policies!", err.Error())
 	}
 	policyDeleteOut, err := svc.DeletePolicyWithContext(req.Context(), &deletePolicyInput)
+	log.Println(policyDeleteOut)
 	if err != nil {
 		throw(resp, 500, "Could not delete policy!", err.Error())
 	}
