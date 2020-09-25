@@ -407,7 +407,10 @@ func (ds *MQTTDatasource) handleRevokeCertificate(resp http.ResponseWriter, req 
 	if err != nil {
 		throw(resp, 500, "Could not create session!", err.Error())
 	}
-	resp.Write([]byte(out.String()))
+	_, errWrite := resp.Write([]byte(out.String()))
+	if errWrite != nil {
+		throw(resp, 500, "Error while creating response body", errWrite.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to REVOKED (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
@@ -456,7 +459,10 @@ func (ds *MQTTDatasource) handleDeleteCertificate(resp http.ResponseWriter, req 
 	if err != nil {
 		throw(resp, 500, "Could not delete certificate!", err.Error())
 	}
-	resp.Write([]byte(out.String()))
+	_, errWrite := resp.Write([]byte(out.String()))
+	if errWrite != nil {
+		throw(resp, 500, "Error while creating response body!", errWrite.Error())
+	}
 
 	// TODO: delete the corresponding policy and certificate
 	// Steps:
