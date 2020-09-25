@@ -95,7 +95,10 @@ func (ds *MQTTDatasource) handleCreateCertificate(resp http.ResponseWriter, req 
 	if err != nil {
 		throw(resp, 500, "Could not attach policy!", err.Error())
 	}
-	resp.Write([]byte(attachPolicyOut.String()))
+	_, errWrite := resp.Write([]byte(attachPolicyOut.String()))
+	if errWrite != nil {
+		throw(resp, 500, "Error while creating response body", errWrite.Error())
+	}
 
 	// TODO: create following resources with following information
 	// AWS IoT Policy (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.CreatePolicyWithContext)
@@ -321,7 +324,10 @@ func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, r
 	if err != nil {
 		throw(resp, 500, "Could not create session!", err.Error())
 	}
-	resp.Write([]byte(out.String()))
+	_, errWrite := resp.Write([]byte(out.String()))
+	if errWrite != nil {
+		throw(resp, 500, "Error while creating response body!", errWrite.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to ACTIVE (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
@@ -360,7 +366,10 @@ func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter,
 	if err != nil {
 		throw(resp, 500, "Could not create session!", err.Error())
 	}
-	resp.Write([]byte(out.String()))
+	_, errWrite := resp.Write([]byte(out.String()))
+	if errWrite != nil {
+		throw(resp, 500, "Error while creating response body!", errWrite.Error())
+	}
 
 	// TODO: Set status of certificate with id = id to INACTIVE (https://docs.aws.amazon.com/sdk-for-go/api/service/iot/#IoT.UpdateCertificateWithContext)
 
