@@ -238,7 +238,7 @@ type Certificate struct {
 
 func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only get requests
-
+	var policiesInput iot.ListPoliciesInput
 	region := req.URL.Query().Get("region")
 	if region == "" {
 		throw(resp, 400, "Invalid or missing region!", "")
@@ -252,10 +252,26 @@ func (ds *MQTTDatasource) handleGetCertificates(resp http.ResponseWriter, req *h
 	}
 	log.Print(req.Context())
 
-	//svc, err := ds.authenticate(req.Context(), region)
-	//if err != nil {
-	//	throw(resp, 500, "Could not create session!", err.Error())
-	//}
+	svc, err := ds.authenticate(req.Context(), region)
+	if err != nil {
+		throw(resp, 500, "Could not create session!", err.Error())
+	}
+
+	policiesOut, err := svc.ListPoliciesWithContext(req.Context(), &policiesInput)
+	if err != nil {
+		throw(resp, 500, "Could not list policies!", err.Error())
+	}
+	for _, policy := range policiesOut.Policies {
+		log.Println(policy)
+		var principalInput iot.ListPolicyPrincipalsInput
+		principalOut, err := svc.ListPolicyPrincipalsWithContext(req.Context(), &principalInput)
+		if err != nil {
+			throw(resp, 500, "Could not create fetch policy principal!", err.Error())
+		}
+		for _, principal := range principalOut.Principals {
+			log.Println(principal)
+		}
+	}
 
 	// TODO: list certificates which have policies for current orgId and dsId
 	// Steps:
@@ -294,6 +310,13 @@ func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, r
 	// TODO: allow only patch requests
 
 	var certificateInput iot.UpdateCertificateInput
+	certID := req.URL.Query().Get("cert_id")
+	if certID == "" {
+		throw(resp, 400, "Invalid or missing certificate id!", "")
+		return
+	}
+	certificateInput.SetCertificateId(certID)
+
 	certificateInput.SetNewStatus("active")
 
 	region := req.URL.Query().Get("region")
@@ -337,6 +360,12 @@ func (ds *MQTTDatasource) handleCertificateSetActive(resp http.ResponseWriter, r
 func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
 	var certificateInput iot.UpdateCertificateInput
+	certID := req.URL.Query().Get("cert_id")
+	if certID == "" {
+		throw(resp, 400, "Invalid or missing certificate id!", "")
+		return
+	}
+	certificateInput.SetCertificateId(certID)
 	certificateInput.SetNewStatus("inactive")
 
 	region := req.URL.Query().Get("region")
@@ -379,6 +408,13 @@ func (ds *MQTTDatasource) handleCertificateSetInactive(resp http.ResponseWriter,
 func (ds *MQTTDatasource) handleRevokeCertificate(resp http.ResponseWriter, req *http.Request) {
 	// TODO: allow only patch requests
 	var certificateInput iot.UpdateCertificateInput
+	certID := req.URL.Query().Get("cert_id")
+	if certID == "" {
+		throw(resp, 400, "Invalid or missing certificate id!", "")
+		return
+	}
+	certificateInput.SetCertificateId(certID)
+
 	certificateInput.SetNewStatus("revoked")
 
 	region := req.URL.Query().Get("region")
